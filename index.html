@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1a2e">
+<title>阅读伴侣</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600;700&family=JetBrains+Mono:wght@300;400&display=swap');
+
+:root {
+  --bg: #1a1a2e;
+  --surface: #1e2a4a;
+  --surface2: #253253;
+  --text: #e8e8e8;
+  --text2: #8a94ad;
+  --accent: #e8a838;
+  --accent2: #4ecdc4;
+  --accent3: #ff6b6b;
+  --muted: #2a3555;
+  --border: #2a3555;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Noto Serif SC', Georgia, serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font-family: inherit; cursor: pointer; border: none; }
+button:active { transform: scale(0.97); }
+input { font-family: inherit; }
+input::placeholder { color: #5a6580; }
+
+/* ===== Toast ===== */
+.toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--accent); color: #1a1a2e;
+  padding: 8px 20px; border-radius: 20px;
+  font-size: 13px; font-weight: 600; z-index: 3000;
+  animation: toastIn 0.3s ease;
+}
+@keyframes toastIn { from { opacity:0; transform: translateX(-50%) translateY(-10px); } }
+
+/* ===== Confirm Dialog ===== */
+.dialog-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2000; padding: 20px;
+}
+.dialog-box {
+  background: var(--surface); border-radius: 12px;
+  padding: 24px 20px; max-width: 340px; width: 100%;
+  border: 1px solid var(--border);
+}
+.dialog-msg { font-size: 14px; line-height: 1.6; text-align: center; margin-bottom: 20px; }
+.dialog-btns { display: flex; gap: 10px; justify-content: center; }
+
+/* ===== Header ===== */
+.header {
+  padding: 16px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--bg); z-index: 100;
+  display: flex; align-items: center; gap: 10px;
+}
+.header h1 { font-size: 18px; font-weight: 700; letter-spacing: 2px; flex: 1; }
+.header .subtitle { font-size: 11px; color: var(--text2); }
+.back-btn {
+  background: none; color: var(--text2); padding: 4px;
+  display: flex; align-items: center;
+}
+
+/* ===== Buttons ===== */
+.btn-primary {
+  background: var(--accent); color: #1a1a2e;
+  padding: 10px 24px; border-radius: 8px;
+  font-size: 14px; font-weight: 600;
+}
+.btn-secondary {
+  background: transparent; color: var(--text2);
+  border: 1px solid var(--border);
+  padding: 10px 24px; border-radius: 8px; font-size: 14px;
+}
+.btn-danger {
+  background: var(--accent3); color: #fff;
+  padding: 10px 24px; border-radius: 8px;
+  font-size: 14px; font-weight: 600;
+}
+
+/* ===== Book Shelf ===== */
+.shelf-header { display: flex; justify-content: space-between; align-items: center; padding: 16px; }
+.shelf-header span { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; }
+.add-book-btn {
+  display: flex; align-items: center; gap: 4px;
+  background: none; border: 1px solid var(--border);
+  color: var(--accent); padding: 6px 12px;
+  border-radius: 6px; font-size: 12px;
+}
+.book-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px 16px; }
+.book-card {
+  background: var(--surface); border-radius: 10px; padding: 14px 12px;
+  cursor: pointer; position: relative; border: 2px solid transparent;
+  transition: border-color 0.2s;
+}
+.book-card.active { border-color: var(--accent); }
+.book-card .title { font-size: 14px; font-weight: 600; line-height: 1.4; }
+.book-card .author { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.book-card .meta { font-size: 10px; color: var(--text2); margin: 6px 0 4px; }
+.book-card .stats { display: flex; justify-content: space-between; font-size: 11px; color: var(--text2); }
+.book-card .badge { position: absolute; top: 8px; right: 8px; background: var(--accent); color: #1a1a2e; font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+.book-card .card-btns { position: absolute; top: 6px; right: 6px; display: flex; gap: 2px; }
+.book-card .card-btns button { background: none; border: none; color: var(--text2); cursor: pointer; padding: 4px; opacity: 0.5; font-size: 14px; }
+
+/* ===== Nav Grid ===== */
+.nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px 16px; }
+.nav-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  padding: 18px 14px; border-radius: 12px; text-align: left; color: var(--text);
+}
+.nav-card .label { font-size: 15px; font-weight: 600; }
+.nav-card .desc { font-size: 11px; opacity: 0.7; }
+.nav-lookup { background: #2d1b4e; }
+.nav-timer { background: #1b3a2d; }
+.nav-wordbook { background: #3a2b1b; }
+.nav-stats { background: #1b2d3a; }
+
+/* ===== View Container ===== */
+.view { padding: 16px; }
+.view-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+.view-sub { font-size: 13px; font-weight: 400; color: var(--text2); }
+
+/* ===== Forms ===== */
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 13px; color: var(--text2); margin-bottom: 6px; }
+.input {
+  width: 100%; padding: 12px 14px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); font-size: 15px; outline: none;
+}
+.form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+
+/* ===== Search ===== */
+.search-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+.search-input {
+  flex: 1; padding: 12px 14px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); font-size: 16px; outline: none;
+}
+.search-btn {
+  background: var(--accent); color: #1a1a2e;
+  border-radius: 10px; width: 48px;
+  display: flex; align-items: center; justify-content: center;
+}
+.input-methods { display: flex; gap: 8px; margin-bottom: 20px; }
+.method-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 14px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text2); font-size: 13px;
+}
+.method-btn.listening { border-color: var(--accent3); color: var(--accent3); background: rgba(255,107,107,0.1); }
+
+/* ===== Dict Status ===== */
+.dict-status {
+  font-size: 11px; color: var(--text2); text-align: center;
+  padding: 6px; margin-bottom: 12px; border-radius: 6px;
+  background: var(--surface);
+}
+.dict-status.loading { color: var(--accent); }
+.dict-status.ready { color: var(--accent2); }
+.dict-status.error { color: var(--accent3); }
+
+/* ===== Result Card ===== */
+.result-card {
+  background: var(--surface); border-radius: 12px;
+  padding: 16px; margin-bottom: 16px; border: 1px solid var(--border);
+}
+.result-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.result-word { font-size: 22px; font-weight: 700; margin-right: 10px; }
+.result-phonetic { font-size: 14px; color: var(--accent); font-style: italic; }
+.result-actions { display: flex; gap: 8px; align-items: center; }
+.save-btn {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--accent); color: #1a1a2e;
+  border-radius: 6px; padding: 6px 12px;
+  font-size: 13px; font-weight: 600;
+}
+.saved-badge { font-size: 12px; color: var(--accent2); font-weight: 600; }
+.audio-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--text2); border-radius: 6px; padding: 6px;
+  display: flex; align-items: center;
+}
+
+.cn-summary {
+  font-size: 15px; color: var(--accent); font-weight: 600;
+  padding: 8px 12px; background: rgba(232,168,56,0.08);
+  border-radius: 6px; margin-bottom: 12px; line-height: 1.5;
+}
+.meaning-group { margin-bottom: 10px; }
+.pos {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  color: var(--accent2); background: rgba(78,205,196,0.1);
+  padding: 2px 8px; border-radius: 4px; margin-bottom: 6px;
+}
+.def-line { font-size: 14px; line-height: 1.6; margin: 4px 0; padding-left: 8px; }
+.def-num { color: var(--text2); margin-right: 4px; font-size: 12px; }
+.cn-def { font-size: 13px; color: var(--accent); padding-left: 20px; margin: 2px 0 6px; line-height: 1.5; }
+
+.example-section {
+  margin-top: 12px; padding: 10px 12px;
+  background: rgba(78,205,196,0.06); border-radius: 6px;
+  border-left: 3px solid var(--accent2);
+}
+.example-label { font-size: 11px; font-weight: 600; color: var(--accent2); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+.example-en { font-size: 13px; font-style: italic; margin: 4px 0; line-height: 1.5; }
+.example-cn { font-size: 13px; color: var(--text2); margin: 2px 0; line-height: 1.5; }
+
+/* ===== Recent Chips ===== */
+.recent-section { margin-top: 20px; }
+.recent-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.recent-chip {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text2); padding: 4px 12px; border-radius: 16px;
+  font-size: 13px; cursor: pointer;
+}
+
+/* ===== Loading / Error ===== */
+.loading { display: flex; align-items: center; gap: 10px; justify-content: center; padding: 20px; color: var(--text2); }
+.spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top: 2px solid var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.error-msg { background: rgba(255,107,107,0.1); color: var(--accent3); padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+
+/* ===== Pomodoro Timer ===== */
+.pom-book-info {
+  display: flex; justify-content: space-between; font-size: 13px;
+  color: var(--text2); padding: 8px 12px; background: var(--surface);
+  border-radius: 8px; margin-bottom: 20px;
+}
+.pom-timer-wrap { position: relative; width: 220px; height: 220px; margin: 0 auto 24px; }
+.pom-timer-inner {
+  position: absolute; inset: 0; display: flex;
+  flex-direction: column; align-items: center; justify-content: center;
+}
+.pom-timer-big { font-size: 42px; font-weight: 300; font-family: 'JetBrains Mono', monospace; letter-spacing: 2px; }
+.pom-timer-label { font-size: 13px; color: var(--text2); margin-top: 4px; }
+.pom-controls { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 24px; }
+.pom-start-btn {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--accent3); color: #fff;
+  padding: 14px 36px; border-radius: 30px;
+  font-size: 16px; font-weight: 600;
+}
+.pom-abandon-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--text2); padding: 8px 20px; border-radius: 20px; font-size: 13px;
+}
+.break-options { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+.long-break-hint { font-size: 13px; color: var(--accent); font-weight: 600; text-align: center; }
+.break-btns { display: flex; gap: 10px; justify-content: center; }
+.break-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); padding: 10px 16px; border-radius: 10px; font-size: 14px;
+}
+.break-btn.highlight { border-color: var(--accent); background: rgba(232,168,56,0.1); }
+.pom-skip { background: none; border: none; color: var(--text2); font-size: 12px; text-decoration: underline; opacity: 0.7; }
+.pom-today { padding: 16px 0; border-top: 1px solid var(--border); margin-bottom: 16px; }
+.pom-tomatoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; min-height: 30px; align-items: center; }
+.pom-tomatoes span { font-size: 22px; }
+.no-tomato { font-size: 13px; color: var(--text2); font-style: italic; }
+
+.session-item {
+  display: flex; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+  font-size: 13px; color: var(--text2);
+}
+.session-dur { font-weight: 600; color: var(--accent2); }
+
+/* ===== Wordbook ===== */
+.wordbook-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.export-btn {
+  display: flex; align-items: center; gap: 4px;
+  background: none; border: 1px solid var(--border);
+  color: var(--accent2); padding: 6px 12px;
+  border-radius: 6px; font-size: 12px; white-space: nowrap;
+}
+.word-list { display: flex; flex-direction: column; gap: 10px; }
+.word-card { background: var(--surface); border-radius: 10px; padding: 12px 14px; border: 1px solid var(--border); }
+.word-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.word-card .ww { font-size: 17px; font-weight: 700; margin-right: 8px; }
+.word-card .wp { font-size: 12px; color: var(--accent); font-style: italic; }
+.word-card-actions { display: flex; gap: 6px; }
+.word-card-actions button { background: none; border: none; color: var(--text2); cursor: pointer; padding: 4px; }
+.word-card .cn-sum { font-size: 12px; color: var(--accent); margin-bottom: 6px; font-weight: 500; }
+.word-card .wm { font-size: 12px; color: var(--text2); line-height: 1.5; margin-bottom: 2px; }
+.word-card .wm .wpos { font-weight: 600; color: var(--accent2); margin-right: 6px; font-style: italic; }
+.word-card .cn-note { font-size: 13px; color: var(--accent); margin-top: 6px; padding: 4px 8px; background: rgba(232,168,56,0.08); border-radius: 4px; }
+.note-edit { display: flex; gap: 8px; margin-top: 8px; }
+.note-input { flex: 1; padding: 8px 10px; background: var(--bg); border: 1px solid var(--accent); border-radius: 6px; color: var(--text); font-size: 13px; outline: none; }
+.note-save { background: var(--accent); color: #1a1a2e; border-radius: 6px; padding: 8px 14px; font-size: 12px; font-weight: 600; }
+.word-date { font-size: 10px; color: var(--text2); margin-top: 6px; opacity: 0.6; }
+
+/* ===== Stats ===== */
+.stats-overview { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+.stat-card { background: var(--surface); border-radius: 10px; padding: 16px 14px; text-align: center; }
+.stat-num { display: block; font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+.stat-label { font-size: 12px; color: var(--text2); }
+.chart-section { margin-bottom: 24px; }
+.section-label { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; }
+.bar-chart { display: flex; align-items: flex-end; gap: 4px; height: 130px; margin-top: 12px; padding: 0 4px; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; position: relative; }
+.bar-wrap { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.bar-fill { width: 70%; min-height: 2px; border-radius: 3px 3px 0 0; transition: height 0.3s; }
+.bar-label { font-size: 8px; color: var(--text2); margin-top: 4px; white-space: nowrap; }
+.bar-value { position: absolute; top: -2px; font-size: 9px; color: var(--text2); font-weight: 600; }
+.book-stat-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.book-stat-name { font-size: 14px; font-weight: 600; }
+.book-stat-name .dot { color: var(--accent); margin-left: 6px; font-size: 10px; }
+.book-stat-nums { display: flex; gap: 14px; font-size: 12px; color: var(--text2); }
+
+/* ===== Empty State ===== */
+.empty { text-align: center; padding: 40px 0; }
+.empty-icon { font-size: 40px; margin-bottom: 8px; }
+.empty-text { color: var(--text2); font-size: 14px; margin-bottom: 16px; }
+
+/* ===== Utilities ===== */
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script>
+// ============================================================
+// 阅读伴侣 - Reading Companion
+// 离线英汉词典 + 番茄计时 + 生词本 + 统计
+// ============================================================
+
+// --- Storage ---
+const STORAGE_KEY = "rc-data";
+function loadData() {
+  try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
+}
+function saveData(data) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+}
+let APP = loadData() || { books: [], words: [], sessions: [] };
+let activeBookId = APP.books.length > 0 ? APP.books[APP.books.length - 1].id : null;
+let currentView = "home";
+let notification = null;
+let confirmDialog = null;
+let editingBookId = null;
+let editingWordId = null;
+
+function persist() { saveData(APP); }
+
+// --- Dictionary Engine ---
+const dictCache = {};
+let dictIndex = null;
+let dictStatus = "idle"; // idle, loading, ready, error
+
+async function loadDictIndex() {
+  dictStatus = "loading";
+  render();
+  try {
+    const res = await fetch("dict/index.json");
+    if (!res.ok) throw new Error("index not found");
+    dictIndex = await res.json();
+    dictStatus = "ready";
+  } catch {
+    dictStatus = "error";
+  }
+  render();
+}
+
+async function loadShard(letter) {
+  if (dictCache[letter]) return dictCache[letter];
+  try {
+    const res = await fetch(`dict/${letter}.json`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    dictCache[letter] = data;
+    return data;
+  } catch { return null; }
+}
+
+async function lookupWord(word) {
+  const w = word.trim().toLowerCase();
+  if (!w) return null;
+  const letter = w[0];
+  if (letter < "a" || letter > "z") return null;
+
+  const shard = await loadShard(letter);
+  if (!shard) return null;
+
+  const entry = shard[w];
+  if (!entry) {
+    // Try fuzzy match: find closest words
+    const keys = Object.keys(shard).filter(k => k.startsWith(w.slice(0, 3)));
+    const suggestions = keys.slice(0, 5);
+    return { error: true, suggestions };
+  }
+
+  // Parse ECDICT format
+  // entry.d = English definition, entry.t = Chinese translation
+  // entry.p = phonetic, entry.o = POS, entry.e = exchange (tenses)
+  const meanings = [];
+  if (entry.d) {
+    // English defs often formatted as "line1\nline2"
+    const lines = entry.d.split("\\n").filter(Boolean);
+    meanings.push(...lines.map(l => ({ en: l.trim() })));
+  }
+
+  // Chinese translation
+  const cnLines = entry.t ? entry.t.split("\\n").filter(Boolean) : [];
+
+  return {
+    word: w,
+    phonetic: entry.p || "",
+    pos: entry.o || "",
+    meanings,
+    cnLines,
+    cnSummary: cnLines[0] || "",
+    exchange: entry.e || "",
+    freq: entry.f || 0,
+  };
+}
+
+// --- Utility ---
+function fmtDuration(s) {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+function fmtDate(ts) {
+  return new Date(ts).toLocaleDateString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+function fmtDateShort(ts) {
+  return new Date(ts).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
+}
+function esc(s) {
+  const d = document.createElement("div"); d.textContent = s; return d.innerHTML;
+}
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+function notify(msg) {
+  notification = msg;
+  render();
+  setTimeout(() => { notification = null; render(); }, 2000);
+}
+
+// --- Pomodoro State ---
+const POMO_WORK = 25 * 60;
+let pomoPhase = "idle"; // idle, work, break, done
+let pomoRemaining = POMO_WORK;
+let pomoBreakDur = 0;
+let pomoBreakRemaining = 0;
+let pomoInterval = null;
+let pomoSessionCount = 0;
+
+function pomoPlayAlarm() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const tone = (f, s, d) => { const o=ctx.createOscillator(),g=ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.value=f; o.type="sine"; g.gain.setValueAtTime(0.3,ctx.currentTime+s); g.gain.exponentialRampToValueAtTime(0.01,ctx.currentTime+s+d); o.start(ctx.currentTime+s); o.stop(ctx.currentTime+s+d); };
+    tone(880,0,0.15); tone(880,0.2,0.15); tone(1100,0.45,0.3);
+  } catch {}
+}
+
+function pomoStart() {
+  pomoPhase = "work"; pomoRemaining = POMO_WORK;
+  clearInterval(pomoInterval);
+  pomoInterval = setInterval(() => {
+    pomoRemaining--;
+    if (pomoRemaining <= 0) {
+      clearInterval(pomoInterval);
+      pomoPlayAlarm();
+      // Save pomodoro
+      APP.sessions.push({ id: genId(), bookId: activeBookId, completedAt: Date.now(), duration: POMO_WORK });
+      persist();
+      pomoSessionCount++;
+      pomoPhase = "done";
+    }
+    render();
+  }, 1000);
+  render();
+}
+
+function pomoStartBreak(mins) {
+  pomoBreakDur = mins; pomoBreakRemaining = mins * 60;
+  pomoPhase = "break";
+  clearInterval(pomoInterval);
+  pomoInterval = setInterval(() => {
+    pomoBreakRemaining--;
+    if (pomoBreakRemaining <= 0) {
+      clearInterval(pomoInterval);
+      pomoPlayAlarm();
+      pomoPhase = "idle"; pomoBreakDur = 0;
+    }
+    render();
+  }, 1000);
+  render();
+}
+
+function pomoAbandon() {
+  clearInterval(pomoInterval);
+  pomoPhase = "idle"; pomoRemaining = POMO_WORK;
+  pomoBreakDur = 0; pomoBreakRemaining = 0;
+  render();
+}
+
+function pomoFmt(secs) {
+  const m = Math.floor(secs / 60), s = secs % 60;
+  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+}
+
+// --- Voice Input ---
+let voiceListening = false;
+function startVoice(cb) {
+  if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) { notify("浏览器不支持语音识别"); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const r = new SR(); r.lang = "en-US"; r.continuous = false; r.interimResults = false;
+  r.onresult = (e) => { voiceListening = false; cb(e.results[0][0].transcript.trim()); render(); };
+  r.onerror = () => { voiceListening = false; render(); };
+  r.onend = () => { voiceListening = false; render(); };
+  r.start(); voiceListening = true; render();
+}
+
+// --- Lookup state ---
+let lookupQuery = "";
+let lookupResult = null;
+let lookupLoading = false;
+let lookupError = "";
+
+async function doLookup(word) {
+  if (!word.trim()) return;
+  lookupQuery = word;
+  lookupLoading = true; lookupError = ""; lookupResult = null;
+  render();
+  const res = await lookupWord(word);
+  lookupLoading = false;
+  if (res && res.error) {
+    lookupError = `未找到 "${esc(word)}"`;
+    if (res.suggestions && res.suggestions.length > 0) {
+      lookupError += `，你是不是要查: ${res.suggestions.join(", ")}？`;
+    }
+  } else if (res) {
+    lookupResult = res;
+  } else {
+    lookupError = "词库未加载，请确认 dict/ 文件夹存在";
+  }
+  render();
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function render() {
+  const root = document.getElementById("app");
+  const activeBook = APP.books.find(b => b.id === activeBookId);
+  const bookWords = APP.words.filter(w => w.bookId === activeBookId);
+  const bookSessions = APP.sessions.filter(s => s.bookId === activeBookId);
+
+  let html = "";
+
+  // Toast
+  if (notification) html += `<div class="toast">${esc(notification)}</div>`;
+
+  // Confirm dialog
+  if (confirmDialog) {
+    html += `<div class="dialog-overlay" onclick="closeDialog()">
+      <div class="dialog-box" onclick="event.stopPropagation()">
+        <p class="dialog-msg">${esc(confirmDialog.message)}</p>
+        <div class="dialog-btns">
+          <button class="btn-secondary" onclick="closeDialog()">取消</button>
+          <button class="btn-danger" onclick="confirmDialog.onConfirm();closeDialog()">确认删除</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // Header
+  html += `<header class="header">`;
+  if (currentView !== "home") {
+    html += `<button class="back-btn" onclick="goHome()">◁</button>`;
+  }
+  html += `<h1>📖 阅读伴侣</h1>`;
+  if (activeBook && currentView === "home") {
+    html += `<div class="subtitle">正在阅读: ${esc(activeBook.name)}</div>`;
+  }
+  html += `</header>`;
+
+  // Views
+  if (currentView === "home") html += renderHome(activeBook, bookWords, bookSessions);
+  else if (currentView === "addbook") html += renderAddBook();
+  else if (currentView === "editbook") html += renderEditBook();
+  else if (currentView === "lookup") html += renderLookup(activeBook, bookWords);
+  else if (currentView === "timer") html += renderTimer(activeBook, bookSessions);
+  else if (currentView === "wordbook") html += renderWordbook(activeBook, bookWords);
+  else if (currentView === "stats") html += renderStats();
+
+  root.innerHTML = html;
+}
+
+function renderHome(activeBook, bookWords, bookSessions) {
+  let h = "";
+
+  // Shelf
+  h += `<div class="shelf-header"><span>我的书架</span><button class="add-book-btn" onclick="goView('addbook')">＋ 添加书籍</button></div>`;
+
+  if (APP.books.length === 0) {
+    h += `<div class="empty"><div class="empty-icon">📚</div><p class="empty-text">还没有添加书籍</p><button class="btn-primary" onclick="goView('addbook')">添加第一本书</button></div>`;
+  } else {
+    h += `<div class="book-grid">`;
+    APP.books.forEach(book => {
+      const wc = APP.words.filter(w => w.bookId === book.id).length;
+      const pc = APP.sessions.filter(s => s.bookId === book.id).length;
+      const days = Math.max(1, Math.ceil((Date.now() - (book.startedAt || book.createdAt)) / 86400000));
+      const isActive = book.id === activeBookId;
+      h += `<div class="book-card ${isActive ? 'active' : ''}" onclick="selectBook('${book.id}')">
+        <div class="title">${esc(book.name)}</div>
+        ${book.author ? `<div class="author">${esc(book.author)}</div>` : ""}
+        <div class="meta">已读 ${days} 天</div>
+        <div class="stats"><span>${wc} 词</span><span>🍅 ×${pc}</span></div>
+        ${isActive ? '<div class="badge">当前</div>' : ''}
+        <div class="card-btns">
+          <button onclick="event.stopPropagation();editBook('${book.id}')" title="编辑">✎</button>
+          <button onclick="event.stopPropagation();confirmDeleteBook('${book.id}','${esc(book.name)}')" title="删除">×</button>
+        </div>
+      </div>`;
+    });
+    h += `</div>`;
+  }
+
+  // Nav
+  if (activeBook) {
+    h += `<div class="nav-grid">
+      <button class="nav-card nav-lookup" onclick="goView('lookup')"><span class="label">快速查词</span><span class="desc">输入、语音</span></button>
+      <button class="nav-card nav-timer" onclick="goView('timer')"><span class="label">番茄计时</span><span class="desc">🍅 ×${bookSessions.length}</span></button>
+      <button class="nav-card nav-wordbook" onclick="goView('wordbook')"><span class="label">生词本</span><span class="desc">${bookWords.length} 个生词</span></button>
+      <button class="nav-card nav-stats" onclick="goView('stats')"><span class="label">数据统计</span><span class="desc">阅读报告</span></button>
+    </div>`;
+  }
+
+  return h;
+}
+
+function renderAddBook() {
+  const today = new Date().toISOString().slice(0, 10);
+  return `<div class="view">
+    <h2 class="view-title">添加新书</h2>
+    <div class="form-group"><label class="form-label">书名 *</label><input class="input" id="ab-name" placeholder="输入书名..." autofocus></div>
+    <div class="form-group"><label class="form-label">作者</label><input class="input" id="ab-author" placeholder="输入作者名..."></div>
+    <div class="form-group"><label class="form-label">开始阅读日期</label><input class="input" id="ab-date" type="date" value="${today}"></div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="goHome()">取消</button>
+      <button class="btn-primary" onclick="doAddBook()">添加</button>
+    </div>
+  </div>`;
+}
+
+function renderEditBook() {
+  const book = APP.books.find(b => b.id === editingBookId);
+  if (!book) return "";
+  const dateStr = new Date(book.startedAt || book.createdAt).toISOString().slice(0, 10);
+  return `<div class="view">
+    <h2 class="view-title">编辑书籍</h2>
+    <div class="form-group"><label class="form-label">书名 *</label><input class="input" id="eb-name" value="${esc(book.name)}"></div>
+    <div class="form-group"><label class="form-label">作者</label><input class="input" id="eb-author" value="${esc(book.author || '')}"></div>
+    <div class="form-group"><label class="form-label">开始阅读日期</label><input class="input" id="eb-date" type="date" value="${dateStr}"></div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="goHome()">取消</button>
+      <button class="btn-primary" onclick="doEditBook()">保存</button>
+    </div>
+  </div>`;
+}
+
+function renderLookup(book, bookWords) {
+  let h = `<div class="view">
+    <h2 class="view-title">查词 <span class="view-sub">《${esc(book.name)}》</span></h2>`;
+
+  // Dict status
+  if (dictStatus === "loading") h += `<div class="dict-status loading">📚 词库加载中...</div>`;
+  else if (dictStatus === "error") h += `<div class="dict-status error">⚠ 词库未找到，请确认 dict/ 目录已部署</div>`;
+  else if (dictStatus === "ready") h += `<div class="dict-status ready">✓ 离线词库就绪 (${dictIndex.totalWords.toLocaleString()} 词)</div>`;
+
+  // Search bar
+  h += `<div class="search-bar">
+    <input class="search-input" id="lookup-input" value="${esc(lookupQuery)}" placeholder="输入英文单词..." onkeydown="if(event.key==='Enter')doLookup(this.value)" autofocus>
+    <button class="search-btn" onclick="doLookup(document.getElementById('lookup-input').value)">🔍</button>
+  </div>`;
+
+  // Input methods
+  h += `<div class="input-methods">
+    <button class="method-btn ${voiceListening ? 'listening' : ''}" onclick="startVoice(w=>{document.getElementById('lookup-input').value=w;doLookup(w)})">🎤 ${voiceListening ? '正在听...' : '语音'}</button>
+  </div>`;
+
+  if (lookupLoading) h += `<div class="loading"><div class="spinner"></div><span>查询中...</span></div>`;
+  if (lookupError) h += `<div class="error-msg">${lookupError}</div>`;
+
+  // Result
+  if (lookupResult && !lookupResult.error) {
+    const r = lookupResult;
+    const saved = bookWords.some(w => w.word.toLowerCase() === r.word.toLowerCase());
+
+    h += `<div class="result-card">
+      <div class="result-header">
+        <div>
+          <span class="result-word">${esc(r.word)}</span>
+          ${r.phonetic ? `<span class="result-phonetic">${esc(r.phonetic)}</span>` : ""}
+        </div>
+        <div class="result-actions">
+          ${!saved ? `<button class="save-btn" onclick="saveWord()">✓ 保存</button>` : `<span class="saved-badge">已保存</span>`}
+        </div>
+      </div>`;
+
+    // Chinese summary
+    if (r.cnSummary) h += `<div class="cn-summary">${esc(r.cnSummary)}</div>`;
+
+    // Chinese lines (full translation)
+    if (r.cnLines.length > 1) {
+      r.cnLines.slice(1).forEach(line => {
+        h += `<div class="cn-def">${esc(line)}</div>`;
+      });
+    }
+
+    // English definitions
+    if (r.meanings.length > 0) {
+      h += `<div style="margin-top:10px">`;
+      r.meanings.forEach((m, i) => {
+        h += `<p class="def-line"><span class="def-num">${i + 1}.</span> ${esc(m.en)}</p>`;
+      });
+      h += `</div>`;
+    }
+
+    // Exchange (tenses)
+    if (r.exchange) {
+      const parts = r.exchange.split("/").filter(Boolean);
+      const labels = { p: "过去式", d: "过去分词", i: "现在分词", 3: "第三人称", r: "比较级", t: "最高级", s: "复数", 0: "原形", 1: "原形" };
+      const exchanges = parts.map(p => {
+        const type = p[0], form = p.slice(2);
+        return labels[type] ? `${labels[type]}: ${form}` : null;
+      }).filter(Boolean);
+      if (exchanges.length > 0) {
+        h += `<div style="margin-top:10px;font-size:12px;color:var(--text2)">📝 ${exchanges.join(" | ")}</div>`;
+      }
+    }
+
+    h += `</div>`;
+  }
+
+  // Recent
+  if (bookWords.length > 0 && !lookupResult && !lookupLoading) {
+    h += `<div class="recent-section"><span class="section-label">最近查询</span><div class="recent-list">`;
+    bookWords.slice(-10).reverse().forEach(w => {
+      h += `<button class="recent-chip" onclick="document.getElementById('lookup-input').value='${esc(w.word)}';doLookup('${esc(w.word)}')">${esc(w.word)}</button>`;
+    });
+    h += `</div></div>`;
+  }
+
+  h += `</div>`;
+  return h;
+}
+
+function renderTimer(book, sessions) {
+  const days = Math.max(1, Math.ceil((Date.now() - (book.startedAt || book.createdAt)) / 86400000));
+  const totalPom = sessions.length;
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const todayPom = sessions.filter(s => s.completedAt >= todayStart.getTime()).length + (pomoPhase !== "idle" ? 0 : 0);
+  const displayToday = todayPom + pomoSessionCount;
+
+  // Progress ring
+  let progress = 0;
+  if (pomoPhase === "work") progress = (POMO_WORK - pomoRemaining) / POMO_WORK;
+  else if (pomoPhase === "break" && pomoBreakDur) progress = ((pomoBreakDur * 60) - pomoBreakRemaining) / (pomoBreakDur * 60);
+  const C = 2 * Math.PI * 90;
+  const offset = C * (1 - progress);
+  const ringColor = pomoPhase === "work" ? "var(--accent3)" : pomoPhase === "break" ? "var(--accent2)" : "var(--muted)";
+
+  let h = `<div class="view">
+    <h2 class="view-title">番茄计时 <span class="view-sub">《${esc(book.name)}》</span></h2>
+    <div class="pom-book-info"><span>已读 ${days} 天</span><span>累计 🍅 ×${totalPom}</span></div>`;
+
+  // Timer circle
+  h += `<div class="pom-timer-wrap">
+    <svg width="220" height="220" viewBox="0 0 220 220" style="transform:rotate(-90deg)">
+      <circle cx="110" cy="110" r="90" fill="none" stroke="var(--muted)" stroke-width="6"/>
+      <circle cx="110" cy="110" r="90" fill="none" stroke="${ringColor}" stroke-width="6" stroke-linecap="round"
+        stroke-dasharray="${C}" stroke-dashoffset="${offset}" style="transition:stroke-dashoffset 0.5s"/>
+    </svg>
+    <div class="pom-timer-inner">`;
+
+  if (pomoPhase === "idle") h += `<span class="pom-timer-big">${pomoFmt(POMO_WORK)}</span><span class="pom-timer-label">准备开始</span>`;
+  else if (pomoPhase === "work") h += `<span class="pom-timer-big" style="color:var(--accent3)">${pomoFmt(pomoRemaining)}</span><span class="pom-timer-label">🍅 专注阅读中</span>`;
+  else if (pomoPhase === "break") h += `<span class="pom-timer-big" style="color:var(--accent2)">${pomoFmt(pomoBreakRemaining)}</span><span class="pom-timer-label">☕ 休息中</span>`;
+  else if (pomoPhase === "done") h += `<span class="pom-timer-big">🍅</span><span class="pom-timer-label">完成！选择休息时长</span>`;
+
+  h += `</div></div>`;
+
+  // Controls
+  h += `<div class="pom-controls">`;
+  if (pomoPhase === "idle") h += `<button class="pom-start-btn" onclick="pomoStart()">▶ 开始番茄</button>`;
+  else if (pomoPhase === "work") h += `<button class="pom-abandon-btn" onclick="pomoAbandon()">放弃这个番茄</button>`;
+  else if (pomoPhase === "done") {
+    const suggestLong = (pomoSessionCount % 4 === 0) && pomoSessionCount > 0;
+    h += `<div class="break-options">`;
+    if (suggestLong) h += `<div class="long-break-hint">已完成 ${pomoSessionCount} 个番茄，建议长休息！</div>`;
+    h += `<div class="break-btns">
+      <button class="break-btn" onclick="pomoStartBreak(5)">☕ 5分钟</button>
+      <button class="break-btn ${suggestLong ? 'highlight' : ''}" onclick="pomoStartBreak(15)">🛋️ 15分钟</button>
+      <button class="break-btn" onclick="pomoStartBreak(30)">🌿 30分钟</button>
+    </div>
+    <button class="pom-skip" onclick="pomoPhase='idle';render()">跳过休息，继续阅读</button>
+    </div>`;
+  } else if (pomoPhase === "break") {
+    h += `<button class="pom-abandon-btn" onclick="clearInterval(pomoInterval);pomoPhase='idle';pomoBreakDur=0;render()">结束休息</button>`;
+  }
+  h += `</div>`;
+
+  // Today tomatoes
+  h += `<div class="pom-today"><span class="section-label">今日番茄</span><div class="pom-tomatoes">`;
+  if (displayToday === 0) h += `<span class="no-tomato">还没有番茄，开始吧！</span>`;
+  else for (let i = 0; i < displayToday; i++) h += `<span>🍅</span>`;
+  h += `</div></div>`;
+
+  // History
+  if (sessions.length > 0) {
+    h += `<div><span class="section-label">历史记录</span>`;
+    sessions.slice().reverse().slice(0, 20).forEach(s => {
+      h += `<div class="session-item"><span>🍅 ${fmtDate(s.completedAt)}</span><span class="session-dur">25 min</span></div>`;
+    });
+    h += `</div>`;
+  }
+
+  h += `</div>`;
+  return h;
+}
+
+function renderWordbook(book, words) {
+  let h = `<div class="view">
+    <div class="wordbook-header">
+      <h2 class="view-title">生词本 <span class="view-sub">《${esc(book.name)}》· ${words.length} 词</span></h2>
+      ${words.length > 0 ? `<button class="export-btn" onclick="exportWords()">📥 导出</button>` : ""}
+    </div>`;
+
+  if (words.length > 5) {
+    h += `<input class="input" style="margin-bottom:16px" placeholder="搜索生词..." oninput="filterWords(this.value)" id="word-filter">`;
+  }
+
+  if (words.length === 0) {
+    h += `<div class="empty"><div class="empty-icon">📝</div><p class="empty-text">还没有保存生词</p></div>`;
+  } else {
+    h += `<div class="word-list" id="word-list">`;
+    words.slice().reverse().forEach(w => {
+      h += `<div class="word-card" data-word="${esc(w.word.toLowerCase())}">
+        <div class="word-card-header">
+          <div><span class="ww">${esc(w.word)}</span>${w.phonetic ? `<span class="wp">${esc(w.phonetic)}</span>` : ""}</div>
+          <div class="word-card-actions">
+            <button onclick="toggleEditNote('${w.id}')" title="笔记">✎</button>
+            <button onclick="deleteWord('${w.id}')" style="color:var(--accent3)" title="删除">🗑</button>
+          </div>
+        </div>`;
+      if (w.cnSummary) h += `<div class="cn-sum">${esc(w.cnSummary)}</div>`;
+      if (w.cnLines && w.cnLines.length > 0) {
+        w.cnLines.slice(0, 3).forEach(l => { h += `<div class="wm">${esc(l)}</div>`; });
+      }
+      if (w.chineseNote && editingWordId !== w.id) {
+        h += `<div class="cn-note">📌 ${esc(w.chineseNote)}</div>`;
+      }
+      if (editingWordId === w.id) {
+        h += `<div class="note-edit">
+          <input class="note-input" id="note-input-${w.id}" value="${esc(w.chineseNote || '')}" placeholder="添加中文笔记..." onkeydown="if(event.key==='Enter')saveNote('${w.id}')">
+          <button class="note-save" onclick="saveNote('${w.id}')">保存</button>
+        </div>`;
+      }
+      h += `<div class="word-date">${fmtDate(w.savedAt)}</div></div>`;
+    });
+    h += `</div>`;
+  }
+
+  h += `</div>`;
+  return h;
+}
+
+function renderStats() {
+  const totalWords = APP.words.length;
+  const totalPom = APP.sessions.length;
+  const totalMin = totalPom * 25;
+  const booksCount = APP.books.length;
+
+  // 14-day data
+  const now = Date.now();
+  const days14 = [];
+  for (let i = 0; i < 14; i++) {
+    const ds = new Date(now - (13 - i) * 86400000); ds.setHours(0,0,0,0);
+    const de = new Date(ds.getTime() + 86400000);
+    days14.push({
+      label: fmtDateShort(ds),
+      words: APP.words.filter(w => w.savedAt >= ds.getTime() && w.savedAt < de.getTime()).length,
+      poms: APP.sessions.filter(s => (s.completedAt || 0) >= ds.getTime() && (s.completedAt || 0) < de.getTime()).length,
+    });
+  }
+  const maxW = Math.max(...days14.map(d => d.words), 1);
+  const maxP = Math.max(...days14.map(d => d.poms), 1);
+
+  let h = `<div class="view"><h2 class="view-title">数据统计</h2>
+    <div class="stats-overview">
+      <div class="stat-card"><span class="stat-num">${booksCount}</span><span class="stat-label">本书</span></div>
+      <div class="stat-card"><span class="stat-num">${totalWords}</span><span class="stat-label">生词</span></div>
+      <div class="stat-card"><span class="stat-num" style="font-size:20px">🍅 ×${totalPom}</span><span class="stat-label">${totalMin} 分钟</span></div>
+      <div class="stat-card"><span class="stat-num">${booksCount > 0 ? Math.round(totalPom / booksCount) : 0}</span><span class="stat-label">平均/本</span></div>
+    </div>`;
+
+  // Word chart
+  h += `<div class="chart-section"><span class="section-label">近14天 · 生词数量</span><div class="bar-chart">`;
+  days14.forEach(d => {
+    const pct = (d.words / maxW * 100);
+    h += `<div class="bar-col"><div class="bar-wrap"><div class="bar-fill" style="height:${pct}%;background:${d.words > 0 ? 'var(--accent)' : 'var(--muted)'}"></div></div><span class="bar-label">${d.label}</span>${d.words > 0 ? `<span class="bar-value">${d.words}</span>` : ""}</div>`;
+  });
+  h += `</div></div>`;
+
+  // Pom chart
+  h += `<div class="chart-section"><span class="section-label">近14天 · 番茄数量 🍅</span><div class="bar-chart">`;
+  days14.forEach(d => {
+    const pct = (d.poms / maxP * 100);
+    h += `<div class="bar-col"><div class="bar-wrap"><div class="bar-fill" style="height:${pct}%;background:${d.poms > 0 ? 'var(--accent3)' : 'var(--muted)'}"></div></div><span class="bar-label">${d.label}</span>${d.poms > 0 ? `<span class="bar-value">${d.poms}</span>` : ""}</div>`;
+  });
+  h += `</div></div>`;
+
+  // Per book
+  if (APP.books.length > 0) {
+    h += `<div class="chart-section"><span class="section-label">各书统计</span>`;
+    APP.books.forEach(b => {
+      const wc = APP.words.filter(w => w.bookId === b.id).length;
+      const pc = APP.sessions.filter(s => s.bookId === b.id).length;
+      const days = Math.max(1, Math.ceil((Date.now() - (b.startedAt || b.createdAt)) / 86400000));
+      h += `<div class="book-stat-row"><div class="book-stat-name">${esc(b.name)}${b.id === activeBookId ? '<span class="dot">●</span>' : ''}</div>
+        <div class="book-stat-nums"><span>${wc} 词</span><span>🍅 ×${pc}</span><span>${days} 天</span></div></div>`;
+    });
+    h += `</div>`;
+  }
+
+  h += `</div>`;
+  return h;
+}
+
+// ============================================================
+// ACTIONS (global functions called from onclick)
+// ============================================================
+
+window.goHome = () => { currentView = "home"; lookupResult = null; lookupError = ""; lookupLoading = false; render(); };
+window.goView = (v) => { currentView = v; if (v === "lookup" && dictStatus === "idle") loadDictIndex(); render(); };
+window.selectBook = (id) => { activeBookId = id; render(); };
+window.closeDialog = () => { confirmDialog = null; render(); };
+
+window.doAddBook = () => {
+  const name = document.getElementById("ab-name").value.trim();
+  const author = document.getElementById("ab-author").value.trim();
+  const date = document.getElementById("ab-date").value;
+  if (!name) return;
+  const book = { id: genId(), name, author, createdAt: Date.now(), startedAt: new Date(date).getTime() };
+  APP.books.push(book); activeBookId = book.id; persist();
+  notify("书籍已添加"); currentView = "home"; render();
+};
+
+window.editBook = (id) => { editingBookId = id; currentView = "editbook"; render(); };
+window.doEditBook = () => {
+  const name = document.getElementById("eb-name").value.trim();
+  const author = document.getElementById("eb-author").value.trim();
+  const date = document.getElementById("eb-date").value;
+  if (!name) return;
+  const book = APP.books.find(b => b.id === editingBookId);
+  if (book) { book.name = name; book.author = author; book.startedAt = new Date(date).getTime(); persist(); }
+  notify("已更新"); currentView = "home"; render();
+};
+
+window.confirmDeleteBook = (id, name) => {
+  confirmDialog = {
+    message: `确定删除《${name}》及其所有生词和番茄记录？`,
+    onConfirm: () => {
+      APP.books = APP.books.filter(b => b.id !== id);
+      APP.words = APP.words.filter(w => w.bookId !== id);
+      APP.sessions = APP.sessions.filter(s => s.bookId !== id);
+      if (activeBookId === id) {
+        activeBookId = APP.books.length > 0 ? APP.books[APP.books.length - 1].id : null;
+      }
+      persist(); notify("已删除");
+    }
+  };
+  render();
+};
+
+window.saveWord = () => {
+  if (!lookupResult || lookupResult.error) return;
+  const r = lookupResult;
+  APP.words.push({
+    id: genId(), bookId: activeBookId, word: r.word, phonetic: r.phonetic,
+    meanings: r.meanings, cnLines: r.cnLines, cnSummary: r.cnSummary,
+    exchange: r.exchange, savedAt: Date.now(), chineseNote: "",
+  });
+  persist(); notify("已保存到生词本"); render();
+};
+
+window.deleteWord = (id) => {
+  APP.words = APP.words.filter(w => w.id !== id); persist(); render();
+};
+
+window.toggleEditNote = (id) => {
+  editingWordId = editingWordId === id ? null : id; render();
+  if (editingWordId) setTimeout(() => { const el = document.getElementById("note-input-" + id); if (el) el.focus(); }, 50);
+};
+
+window.saveNote = (id) => {
+  const el = document.getElementById("note-input-" + id);
+  if (!el) return;
+  const w = APP.words.find(w => w.id === id);
+  if (w) { w.chineseNote = el.value; persist(); }
+  editingWordId = null; render();
+};
+
+window.filterWords = (query) => {
+  const q = query.toLowerCase();
+  document.querySelectorAll(".word-card").forEach(card => {
+    card.style.display = card.dataset.word.includes(q) ? "" : "none";
+  });
+};
+
+window.exportWords = () => {
+  const book = APP.books.find(b => b.id === activeBookId);
+  const words = APP.words.filter(w => w.bookId === activeBookId);
+  const lines = words.map(w => {
+    const cn = (w.cnLines || []).join("; ");
+    const en = (w.meanings || []).map(m => m.en).join("; ");
+    return `${w.word}\t${w.phonetic || ""}\t${cn}\t${en}\t${w.chineseNote || ""}\t${fmtDate(w.savedAt)}`;
+  });
+  const csv = "单词\t音标\t中文释义\t英文释义\t个人笔记\t保存时间\n" + lines.join("\n");
+  const blob = new Blob(["\ufeff" + csv], { type: "text/tab-separated-values;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `${book ? book.name : "生词本"}_生词本.tsv`; a.click();
+  URL.revokeObjectURL(url);
+};
+
+// Make pomo functions global
+window.pomoStart = pomoStart;
+window.pomoStartBreak = pomoStartBreak;
+window.pomoAbandon = pomoAbandon;
+window.doLookup = doLookup;
+window.startVoice = startVoice;
+
+// ============================================================
+// INIT
+// ============================================================
+render();
+</script>
+</body>
+</html>
