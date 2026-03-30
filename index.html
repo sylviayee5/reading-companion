@@ -8,6 +8,8 @@
 <meta name="theme-color" content="#1a1a2e">
 <title>阅读伴侣</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600;700&family=JetBrains+Mono:wght@300;400&display=swap');
 
@@ -1075,8 +1077,129 @@ window.doLookup = doLookup;
 window.startVoice = startVoice;
 
 // ============================================================
+// FIREBASE CLOUD SYNC
+// ============================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyAuwN2gx9DgfaT02VISl5GvZEgTIRic51I",
+  authDomain: "reading-companion-fe53f.firebaseapp.com",
+  projectId: "reading-companion-fe53f",
+  storageBucket: "reading-companion-fe53f.firebasestorage.app",
+  messagingSenderId: "559296236653",
+  appId: "1:559296236653:web:b7393f90a04cd326cf8364"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Generate or retrieve a sync key (shared across devices)
+let userId = localStorage.getItem("rc-uid");
+if (!userId) {
+  // First time: ask user to set or enter a sync key
+  userId = prompt("设置一个同步密钥（随便取个名字，所有设备输入相同的密钥即可同步数据）：", "shuhua");
+  if (!userId || !userId.trim()) userId = "default_" + genId();
+  userId = userId.trim().toLowerCase().replace(/[^a-z0-9_\u4e00-\u9fff]/g, "_");
+  localStorage.setItem("rc-uid", userId);
+}
+
+const docRef = db.collection("userData").doc(userId);
+
+let syncStatus = "idle"; // idle, syncing, done, error
+let lastSyncTime = 0;
+
+async function cloudSave() {
+  if (syncStatus === "syncing") return;
+  syncStatus = "syncing";
+  try {
+    await docRef.set({
+      books: APP.books,
+      words: APP.words,
+      sessions: APP.sessions,
+      updatedAt: Date.now()
+    });
+    syncStatus = "done";
+    lastSyncTime = Date.now();
+  } catch (e) {
+    console.error("Cloud save error:", e);
+    syncStatus = "error";
+  }
+}
+
+async function cloudLoad() {
+  syncStatus = "syncing";
+  render();
+  try {
+    const snap = await docRef.get();
+    if (snap.exists) {
+      const cloud = snap.data();
+      const localTime = APP.updatedAt || 0;
+      const cloudTime = cloud.updatedAt || 0;
+
+      // Merge: use whichever is newer, or merge if both have data
+      if (cloudTime > localTime || (APP.books.length === 0 && cloud.books && cloud.books.length > 0)) {
+        APP.books = cloud.books || [];
+        APP.words = cloud.words || [];
+        APP.sessions = cloud.sessions || [];
+        APP.updatedAt = cloudTime;
+        // Update activeBookId
+        if (APP.books.length > 0 && !APP.books.find(b => b.id === activeBookId)) {
+          activeBookId = APP.books[APP.books.length - 1].id;
+        }
+        persist();
+        notify("☁ 云端数据已同步");
+      }
+    } else {
+      // No cloud data yet, push local data up
+      await cloudSave();
+    }
+    syncStatus = "done";
+    lastSyncTime = Date.now();
+  } catch (e) {
+    console.error("Cloud load error:", e);
+    syncStatus = "error";
+  }
+  render();
+}
+
+// Override persist to also save to cloud
+const _origPersist = persist;
+persist = function() {
+  APP.updatedAt = Date.now();
+  saveData(APP);
+  // Debounce cloud save
+  clearTimeout(persist._timer);
+  persist._timer = setTimeout(cloudSave, 1500);
+};
+
+// Sync indicator in header
+const origRenderHome = renderHome;
+
+// ============================================================
 // INIT
 // ============================================================
+render();
+// Load from cloud on startup
+cloudLoad();
+
+// Also show sync status in header - add a small indicator
+const _origRender = render;
+render = function() {
+  _origRender();
+  // Add sync indicator to header
+  const header = document.querySelector(".header");
+  if (header) {
+    let indicator = document.getElementById("sync-dot");
+    if (!indicator) {
+      indicator = document.createElement("span");
+      indicator.id = "sync-dot";
+      indicator.style.cssText = "font-size:10px;margin-left:auto;padding:2px 6px;border-radius:8px;";
+      header.appendChild(indicator);
+    }
+    if (syncStatus === "syncing") { indicator.textContent = "⟳ 同步中"; indicator.style.color = "var(--accent)"; }
+    else if (syncStatus === "done") { indicator.textContent = "☁ 已同步"; indicator.style.color = "var(--accent2)"; }
+    else if (syncStatus === "error") { indicator.textContent = "⚠ 离线"; indicator.style.color = "var(--accent3)"; }
+    else { indicator.textContent = ""; }
+  }
+};
 render();
 </script>
 </body>
