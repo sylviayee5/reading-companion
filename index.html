@@ -1091,23 +1091,35 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// Generate or retrieve a sync key (shared across devices)
+// Sync key management
 let userId = localStorage.getItem("rc-uid");
 if (!userId) {
-  // First time: ask user to set or enter a sync key
-  userId = prompt("设置一个同步密钥（随便取个名字，所有设备输入相同的密钥即可同步数据）：", "shuhua");
+  userId = prompt("设置同步密钥（所有设备输入相同密钥即可同步）：", "shuhua");
   if (!userId || !userId.trim()) userId = "default_" + genId();
   userId = userId.trim().toLowerCase().replace(/[^a-z0-9_\u4e00-\u9fff]/g, "_");
   localStorage.setItem("rc-uid", userId);
 }
 
-const docRef = db.collection("userData").doc(userId);
+let docRef = db.collection("userData").doc(userId);
+let syncStatus = "idle";
 
-let syncStatus = "idle"; // idle, syncing, done, error
-let lastSyncTime = 0;
+// Settings: change sync key
+window.showSyncSettings = function() {
+  const current = localStorage.getItem("rc-uid") || "";
+  const newKey = prompt("当前同步密钥: " + current + "\n\n输入新密钥（所有设备须一致）：", current);
+  if (newKey && newKey.trim() && newKey.trim().toLowerCase() !== current) {
+    const cleaned = newKey.trim().toLowerCase().replace(/[^a-z0-9_\u4e00-\u9fff]/g, "_");
+    localStorage.setItem("rc-uid", cleaned);
+    userId = cleaned;
+    docRef = db.collection("userData").doc(userId);
+    // Force reload from new key
+    cloudLoad();
+  }
+};
 
 async function cloudSave() {
-  if (syncStatus === "syncing") return;
+  // NEVER upload empty data to cloud if cloud might have real data
+  if (APP.books.length === 0 && APP.words.length === 0 && APP.sessions.length === 0) return;
   syncStatus = "syncing";
   try {
     await docRef.set({
@@ -1117,7 +1129,6 @@ async function cloudSave() {
       updatedAt: Date.now()
     });
     syncStatus = "done";
-    lastSyncTime = Date.now();
   } catch (e) {
     console.error("Cloud save error:", e);
     syncStatus = "error";
@@ -1131,28 +1142,43 @@ async function cloudLoad() {
     const snap = await docRef.get();
     if (snap.exists) {
       const cloud = snap.data();
-      const localTime = APP.updatedAt || 0;
-      const cloudTime = cloud.updatedAt || 0;
+      const cloudHasData = cloud.books && cloud.books.length > 0;
+      const localHasData = APP.books.length > 0;
 
-      // Merge: use whichever is newer, or merge if both have data
-      if (cloudTime > localTime || (APP.books.length === 0 && cloud.books && cloud.books.length > 0)) {
+      if (cloudHasData && !localHasData) {
+        // Local is empty, cloud has data: always use cloud
         APP.books = cloud.books || [];
         APP.words = cloud.words || [];
         APP.sessions = cloud.sessions || [];
-        APP.updatedAt = cloudTime;
-        // Update activeBookId
-        if (APP.books.length > 0 && !APP.books.find(b => b.id === activeBookId)) {
-          activeBookId = APP.books[APP.books.length - 1].id;
-        }
-        persist();
+        APP.updatedAt = cloud.updatedAt || Date.now();
+        activeBookId = APP.books.length > 0 ? APP.books[APP.books.length - 1].id : null;
+        saveData(APP);
         notify("☁ 云端数据已同步");
+      } else if (cloudHasData && localHasData) {
+        // Both have data: use whichever is newer
+        const cloudTime = cloud.updatedAt || 0;
+        const localTime = APP.updatedAt || 0;
+        if (cloudTime > localTime) {
+          APP.books = cloud.books || [];
+          APP.words = cloud.words || [];
+          APP.sessions = cloud.sessions || [];
+          APP.updatedAt = cloudTime;
+          if (!APP.books.find(b => b.id === activeBookId)) {
+            activeBookId = APP.books[APP.books.length - 1].id;
+          }
+          saveData(APP);
+          notify("☁ 云端数据已同步");
+        }
+      } else if (!cloudHasData && localHasData) {
+        // Cloud is empty, local has data: push local to cloud
+        await cloudSave();
       }
-    } else {
-      // No cloud data yet, push local data up
+      // If both empty, do nothing
+    } else if (APP.books.length > 0) {
+      // No cloud doc exists, but local has data: push up
       await cloudSave();
     }
     syncStatus = "done";
-    lastSyncTime = Date.now();
   } catch (e) {
     console.error("Cloud load error:", e);
     syncStatus = "error";
@@ -1160,38 +1186,34 @@ async function cloudLoad() {
   render();
 }
 
-// Override persist to also save to cloud
-const _origPersist = persist;
+// Override persist to also save to cloud (debounced)
 persist = function() {
   APP.updatedAt = Date.now();
   saveData(APP);
-  // Debounce cloud save
   clearTimeout(persist._timer);
   persist._timer = setTimeout(cloudSave, 1500);
 };
-
-// Sync indicator in header
-const origRenderHome = renderHome;
 
 // ============================================================
 // INIT
 // ============================================================
 render();
-// Load from cloud on startup
 cloudLoad();
 
-// Also show sync status in header - add a small indicator
+// Render with sync indicator and settings button
 const _origRender = render;
 render = function() {
   _origRender();
-  // Add sync indicator to header
   const header = document.querySelector(".header");
   if (header) {
+    // Sync indicator
     let indicator = document.getElementById("sync-dot");
     if (!indicator) {
       indicator = document.createElement("span");
       indicator.id = "sync-dot";
-      indicator.style.cssText = "font-size:10px;margin-left:auto;padding:2px 6px;border-radius:8px;";
+      indicator.style.cssText = "font-size:10px;padding:2px 6px;border-radius:8px;cursor:pointer;";
+      indicator.onclick = window.showSyncSettings;
+      indicator.title = "点击修改同步密钥";
       header.appendChild(indicator);
     }
     if (syncStatus === "syncing") { indicator.textContent = "⟳ 同步中"; indicator.style.color = "var(--accent)"; }
