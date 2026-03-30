@@ -717,6 +717,7 @@ function renderLookup(book, bookWords) {
           ${r.phonetic ? `<span class="result-phonetic">${esc(r.phonetic)}</span>` : ""}
         </div>
         <div class="result-actions">
+          <button class="audio-btn" onclick="speakWord('${esc(r.word)}')" title="朗读">🔊</button>
           ${!saved ? `<button class="save-btn" onclick="saveWord()">✓ 保存</button>` : `<span class="saved-badge">已保存</span>`}
         </div>
       </div>`;
@@ -863,6 +864,7 @@ function renderWordbook(book, words) {
         <div class="word-card-header">
           <div><span class="ww">${esc(w.word)}</span>${w.phonetic ? `<span class="wp">${esc(w.phonetic)}</span>` : ""}</div>
           <div class="word-card-actions">
+            <button onclick="speakWord('${esc(w.word)}')" title="朗读">🔊</button>
             <button onclick="toggleEditNote('${w.id}')" title="笔记">✎</button>
             <button onclick="deleteWord('${w.id}')" style="color:var(--accent3)" title="删除">🗑</button>
           </div>
@@ -1047,6 +1049,23 @@ window.exportWords = () => {
   a.href = url; a.download = `${book ? book.name : "生词本"}_生词本.tsv`; a.click();
   URL.revokeObjectURL(url);
 };
+
+// --- Text-to-Speech ---
+function speakWord(word) {
+  if (!("speechSynthesis" in window)) { notify("浏览器不支持语音朗读"); return; }
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(word);
+  u.lang = "en-US";
+  u.rate = 0.85;
+  // Prefer a natural English voice
+  const voices = window.speechSynthesis.getVoices();
+  const enVoice = voices.find(v => v.lang.startsWith("en") && v.name.includes("Samantha"))
+    || voices.find(v => v.lang.startsWith("en-") && !v.name.includes("Google"))
+    || voices.find(v => v.lang.startsWith("en"));
+  if (enVoice) u.voice = enVoice;
+  window.speechSynthesis.speak(u);
+}
+window.speakWord = speakWord;
 
 // Make pomo functions global
 window.pomoStart = pomoStart;
